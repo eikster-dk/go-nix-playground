@@ -38,9 +38,11 @@ func run(ctx context.Context, getEnv getEnv, stderr io.Writer) error {
 	jsonLogger := slog.New(logHandler)
 	slog.SetDefault(jsonLogger)
 
+	port := getConfig(getEnv, "PORT", "8080")
+
 	srv := NewServer()
 	httpServer := &http.Server{
-		Addr:    net.JoinHostPort("localhost", "8080"),
+		Addr:    net.JoinHostPort("0.0.0.0", port),
 		Handler: srv,
 	}
 

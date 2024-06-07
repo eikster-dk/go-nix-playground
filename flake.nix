@@ -1,42 +1,86 @@
 {
-  description = "A very basic flake";
+  description = "very basic flake";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
   };
 
-  outputs = { self, nixpkgs, ... }:
-  let
-    forAllSystems = nixpkgs.lib.genAttrs [ "aarch64-darwin" "aarch64-linux" ];
-    pkgsForSystem = system: (import nixpkgs {
-      inherit system;
-    });
-  in
-  {
-    packages = forAllSystems
-     (system:
+  outputs =
+    { self
+    , nixpkgs
+    ,
+    }:
+    let
+      #System types to support.
+      supportedSystems = [ "aarch64-linux" "aarch64-darwin" ];
+
+      # Helper function to generate an attrset '{ x86_64-linux = f "x86_64-linux"; ... }'.
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+
+      # Nixpkgs instantiated for supported system types.
+      nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
+
+      version = "0.0.1";
+      pname = "webapp";
+    in
+    {
+      packages = forAllSystems (system:
         let
-          inherit (pkgsForSystem system) buildGoModule lib;
-          version = self.shortRev or (builtins.substring 0 7 self.dirtyRev);
-          rev = self.rev or self.dirtyRev;
+          pkgs = nixpkgsFor.${system};
         in
         {
-          default = self.packages.${system}.webapp;
-
-          webapp = buildGoModule rec {
+          ${pname} = pkgs.buildGoModule {
+            inherit pname;
             inherit version;
-            pname = "webapp";
-            src = ./.;
-            subPackages = [ "cmd/webapp" ];
 
-            CGO_ENABLED=0;
-            ldflags = [
-              "-w -s"
-            ];
-            tags = [];
+            src = ./.;
+
             vendorHash = "sha256-QNEbR1YvJiKSrwdiC1MLsoiNdbHfOBGUWMY0Ar8klsw=";
           };
-        }
-     );
-  };
+        });
+      nixosModules.default = forAllSystems (system:
+        let
+          pkgs = nixpkgsFor.${system};
+        in
+        { config
+        , lib
+        , pkgs
+        , ...
+        }:
+          with lib; let
+            cfg = config.playground.services.webapp;
+          in
+          {
+            options.playground.services.webapp = {
+              enable = mkEnableOption "Enable webapp";
+
+              package = mkOption {
+                type = types.package;
+                default = self.packages.${system}.webapp;
+                description = "webapp to use";
+              };
+
+              port = mkOption {
+                type = types.port;
+                default = 8051;
+                description = "port to serve webapp on";
+              };
+            };
+            config = mkIf cfg.enable {
+              systemd.services.webapp = {
+                description = "webapp";
+                wantedBy = [ "multi-user.target" ];
+                environment = {
+                  PORT = "${toString cfg.port}";
+                };
+                serviceConfig = {
+                  ExecStart = "${cfg.package}/bin/webapp";
+                  ProtectHome = "read-only";
+                  Restart = "on-failure";
+                  Type = "exec";
+                };
+              };
+            };
+          });
+    };
 }
