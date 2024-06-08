@@ -36,5 +36,9 @@
             vendorHash = "sha256-QNEbR1YvJiKSrwdiC1MLsoiNdbHfOBGUWMY0Ar8klsw=";
           };
         });
+
+      overlays = forAllSystems (system: final: prev: {
+         hoejtiderne = self.packages.${system}.default;
+      });
     };
 }
