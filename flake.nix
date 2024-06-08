@@ -21,7 +21,7 @@
       nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
 
       version = "0.0.1";
-      pname = "webapp";
+      pname = "app"
     in
     {
       packages = forAllSystems (system:
@@ -30,9 +30,8 @@
         in
         {
           ${pname} = pkgs.buildGoModule {
-            inherit pname;
             inherit version;
-
+            inherit name;
             src = ./.;
 
             vendorHash = "sha256-QNEbR1YvJiKSrwdiC1MLsoiNdbHfOBGUWMY0Ar8klsw=";
